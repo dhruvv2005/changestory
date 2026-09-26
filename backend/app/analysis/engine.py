@@ -6,6 +6,7 @@ risk evaluation, test recommendations, and limitation aggregation.
 
 from datetime import datetime, timezone
 import hashlib
+import re
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -72,6 +73,66 @@ class ChangeStoryEngine:
 
         return modules
 
+    def _resolve_module(self, file_path: str, repo_modules: Dict[str, ParsedModuleInfo]) -> Optional[ParsedModuleInfo]:
+        """Try multiple strategies to resolve a diff file path to a ParsedModuleInfo.
+
+        Handles cases where the diff uses a different path prefix than the scanned repo,
+        e.g. 'a/src/calc.py' vs 'src/calc.py' vs 'calc.py'.
+        """
+        # Strategy 1: exact match
+        if file_path in repo_modules:
+            return repo_modules[file_path]
+
+        # Strategy 2: suffix match — find any scanned module whose path ends with file_path
+        for k, v in repo_modules.items():
+            if k.endswith(file_path) or file_path.endswith(k):
+                return v
+
+        # Strategy 3: basename match (last resort for flat projects)
+        basename = file_path.split("/")[-1]
+        candidates = [v for k, v in repo_modules.items() if k.split("/")[-1] == basename]
+        if len(candidates) == 1:
+            return candidates[0]
+
+        # Strategy 4: try loading from disk with various path combinations
+        for try_path in [self.repo_dir / file_path, Path(file_path)]:
+            if try_path.exists() and try_path.suffix == ".py":
+                mod = parse_python_file(try_path, file_path)
+                repo_modules[file_path] = mod
+                return mod
+
+        return None
+
+    def _extract_source_from_diff(self, diff_text: str, file_path: str) -> Optional[str]:
+        """Reconstruct approximated source from diff hunk lines (+/context) for a given file.
+
+        Used when the file isn't found on disk (e.g. custom diff of a remote repo).
+        This lets AST analysis work on the NEW version of the file as shown in the diff.
+        """
+        lines: List[str] = []
+        in_target = False
+        for line in diff_text.splitlines():
+            if line.startswith("--- ") or line.startswith("+++ "):
+                # Check if this hunk block belongs to our file
+                raw = line[4:].strip().lstrip("ab/")
+                if file_path.endswith(raw) or raw.endswith(file_path.split("/")[-1]):
+                    in_target = True
+                else:
+                    if in_target and line.startswith("--- "):
+                        break  # moved to next file
+                continue
+            if not in_target:
+                continue
+            if line.startswith("@@"):
+                continue
+            if line.startswith("+"):
+                lines.append(line[1:])
+            elif line.startswith("-"):
+                pass  # skip deleted lines — we want the new version
+            elif line.startswith(" "):
+                lines.append(line[1:])
+        return "\n".join(lines) if lines else None
+
     def analyze(self, diff_text: str, session_id: Optional[str] = None) -> ChangeStoryReport:
         """Run complete deterministic analysis pipeline."""
         if not session_id:
@@ -114,13 +175,18 @@ class ChangeStoryEngine:
             # Map changed lines to symbols if Python file
             symbols_for_file: List[Symbol] = []
             if pf.file_path.endswith(".py"):
-                mod_info = repo_modules.get(pf.file_path)
+                # Try all resolution strategies
+                mod_info = self._resolve_module(pf.file_path, repo_modules)
+
                 if not mod_info:
-                    # Try checking if file exists on disk
-                    file_disk_path = self.repo_dir / pf.file_path
-                    if file_disk_path.exists():
-                        mod_info = parse_python_file(file_disk_path, pf.file_path)
+                    # Last resort: reconstruct source from diff hunk lines for AST parsing
+                    extracted = self._extract_source_from_diff(diff_text, pf.file_path)
+                    if extracted and extracted.strip():
+                        mod_info = parse_python_source(extracted, pf.file_path)
                         repo_modules[pf.file_path] = mod_info
+                        all_limitations.append(
+                            f"'{pf.file_path}' not found on disk — AST analysis based on diff hunk content only (partial)."
+                        )
 
                 if mod_info:
                     syms, evs, limits = map_changed_lines_to_symbols(mod_info, pf.changed_lines)
@@ -128,7 +194,11 @@ class ChangeStoryEngine:
                     all_evidence.extend(evs)
                     all_limitations.extend(limits)
                 else:
-                    all_limitations.append(f"Python file '{pf.file_path}' not found in active repository.")
+                    all_limitations.append(
+                        f"Python file '{pf.file_path}' not found in repository or diff. "
+                        f"For custom diffs, use 'local' source_mode with a repository_path, "
+                        f"or ensure diff paths match files in sample-project/."
+                    )
             else:
                 all_limitations.append(f"Non-Python file '{pf.file_path}' detected; AST analysis skipped.")
 

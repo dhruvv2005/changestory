@@ -91,7 +91,11 @@ function ChangeStoryDashboard() {
     clearInspector();
 
     try {
-      const rep = await analyzeDiff(diffText, "sample");
+      // Use "sample" mode for built-in scenarios (files exist in sample-project/).
+      // Use "local" for custom diffs so the engine tries broader path resolution
+      // (suffix matching, disk search, and diff-hunk AST reconstruction).
+      const sourceMode = activeScenarioId ? "sample" : "local";
+      const rep = await analyzeDiff(diffText, sourceMode);
       setReport(rep);
     } catch (err: any) {
       setError(err.message || "Analysis request failed. Ensure ChangeStory backend is running.");

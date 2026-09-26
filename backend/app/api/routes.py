@@ -15,7 +15,7 @@ from fastapi import APIRouter, HTTPException, Response
 from fastapi.responses import PlainTextResponse
 
 from app.analysis.engine import ChangeStoryEngine
-from app.config import FIXTURES_DIR, SAMPLE_PROJECT_DIR
+from app.config import BASE_DIR, FIXTURES_DIR, SAMPLE_PROJECT_DIR
 from app.models.schemas import (
     AnalyzeRequest,
     ChangeStoryReport,
@@ -44,6 +44,10 @@ def analyze_diff(req: AnalyzeRequest) -> ChangeStoryReport:
         if not local_path.exists() or not local_path.is_dir():
             raise HTTPException(status_code=400, detail=f"Local repository path does not exist: {req.repository_path}")
         target_dir = local_path
+    elif req.source_mode == "local":
+        # No explicit path: scan from project root so suffix/basename matching
+        # works for any custom diff that references Python files by partial path.
+        target_dir = BASE_DIR
     else:
         target_dir = SAMPLE_PROJECT_DIR
 
