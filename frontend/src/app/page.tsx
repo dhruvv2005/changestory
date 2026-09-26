@@ -65,11 +65,6 @@ function ChangeStoryDashboard() {
           } finally {
             setLoading(false);
           }
-        } else if (scList.length > 0) {
-          // Preselect Scenario A for immediate live demo preview
-          const first = scList[0];
-          setActiveScenarioId(first.id);
-          setDiffText(first.diff_text);
         }
       } catch (err: any) {
         console.warn("Could not fetch scenarios from backend:", err);
@@ -91,10 +86,9 @@ function ChangeStoryDashboard() {
     clearInspector();
 
     try {
-      // Use "sample" mode for built-in scenarios (files exist in sample-project/).
-      // Use "local" for custom diffs so the engine tries broader path resolution
-      // (suffix matching, disk search, and diff-hunk AST reconstruction).
-      const sourceMode = activeScenarioId ? "sample" : "local";
+      // Demo diffs use the bundled sample context. Pasted diffs are labeled
+      // diff-only so the report does not imply repository-wide impact coverage.
+      const sourceMode = activeScenarioId ? "sample" : "diff_only";
       const rep = await analyzeDiff(diffText, sourceMode);
       setReport(rep);
     } catch (err: any) {
@@ -186,10 +180,24 @@ function ChangeStoryDashboard() {
           </div>
         )}
 
-        {/* Diff input & scenario selector */}
+        {!urlSessionId && !report && (
+          <section className="rounded-xl border border-cyan-900/60 bg-cyan-950/25 p-5">
+            <h2 className="text-sm font-semibold text-cyan-100">Analyze changes in your local project</h2>
+            <p className="mt-1 text-xs text-slate-300">
+              Run <code className="text-cyan-300">changestory init</code> once, then <code className="text-cyan-300">changestory analyze</code> after code changes. The CLI uses your Git repository for caller and test context, then opens this dashboard with the report.
+            </p>
+          </section>
+        )}
+
+        {/* Advanced diff input and demo scenarios */}
         <DiffInput
           diffText={diffText}
-          onChangeDiff={setDiffText}
+          onChangeDiff={(text) => {
+            setDiffText(text);
+            if (activeScenarioId && text !== scenarios.find((scenario) => scenario.id === activeScenarioId)?.diff_text) {
+              setActiveScenarioId(null);
+            }
+          }}
           onAnalyze={handleAnalyze}
           onReset={handleReset}
           loading={loading}
@@ -208,6 +216,7 @@ function ChangeStoryDashboard() {
                   Analysis Findings & Impact Map
                 </h2>
                 <p className="text-xs text-slate-400">
+                  {report.project?.name ? `${report.project.name} · ${report.project.analysis_mode} analysis · ` : ""}
                   Generated at {report.timestamp ? new Date(report.timestamp).toLocaleTimeString() : "N/A"}
                 </p>
               </div>
@@ -281,6 +290,7 @@ function ChangeStoryDashboard() {
               verification={report.verification}
               onRunVerification={handleRunVerification}
               loading={verifying}
+              enabled={report.project?.analysis_mode === "sample"}
             />
 
             {/* Explicit Limitations Section */}

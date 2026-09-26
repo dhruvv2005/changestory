@@ -4,7 +4,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 export async function analyzeDiff(
   diffText: string,
-  sourceMode: "sample" | "local" = "sample"
+  sourceMode: "sample" | "local" | "diff_only" = "diff_only"
 ): Promise<ChangeStoryReport> {
   const res = await fetch(`${API_BASE}/api/v1/analyze`, {
     method: "POST",

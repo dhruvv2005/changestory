@@ -109,7 +109,7 @@ def find_call_sites_in_file(
 ) -> List[CallSite]:
     """Find all function call sites in a python file."""
     try:
-        content = file_path.read_text(encoding="utf-8")
+        content = file_path.read_text(encoding="utf-8-sig")
         lines = content.splitlines()
         tree = ast.parse(content, filename=relative_path)
         visitor = CallVisitor(relative_path, lines, module_prefix)

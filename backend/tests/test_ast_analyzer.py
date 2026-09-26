@@ -65,3 +65,10 @@ def test_syntax_error_graceful_handling():
     changed_symbols, evidence, limits = map_changed_lines_to_symbols(mod, [1])
     assert len(changed_symbols) == 0
     assert any("syntax error" in l.lower() for l in limits)
+
+
+def test_parse_python_source_accepts_utf8_bom():
+    mod = parse_python_source("\ufeffdef calculate_total(items):\n    return sum(items)\n", "calculator.py")
+
+    assert not mod.has_syntax_error
+    assert [symbol.name for symbol in mod.symbols] == ["calculate_total"]

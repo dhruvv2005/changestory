@@ -42,10 +42,10 @@ export const DiffInput: React.FC<DiffInputProps> = ({
         <div>
           <h2 className="text-sm font-semibold text-white flex items-center space-x-2">
             <FileCode className="h-4 w-4 text-cyan-400" />
-            <span>Unified Diff Input</span>
+            <span>Advanced: Analyze a supplied diff</span>
           </h2>
           <p className="text-xs text-slate-400">
-            Paste a Git diff or select one of the controlled scenarios below
+            Pasted diffs have no repository context; use the CLI for full local impact analysis
           </p>
         </div>
 
@@ -85,7 +85,7 @@ export const DiffInput: React.FC<DiffInputProps> = ({
             setErrorMsg(null);
             onChangeDiff(e.target.value);
           }}
-          placeholder="Paste unified git diff here (e.g. diff --git a/... b/... or --- a/... +++ b/...)"
+          placeholder="Paste a unified Git diff for diff-only analysis (no repository callers or test mapping)"
           rows={6}
           className="w-full font-mono text-xs bg-slate-950/80 text-slate-200 border border-slate-800 rounded-lg p-3 focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 resize-y placeholder:text-slate-600"
         />
@@ -99,7 +99,7 @@ export const DiffInput: React.FC<DiffInputProps> = ({
 
       <div className="mt-3.5 flex items-center justify-between">
         <span className="text-xs text-slate-400">
-          Target: <strong className="text-slate-300">Controlled Sample Project (changestory_sample)</strong>
+          Target: <strong className="text-slate-300">{activeScenarioId ? "Bundled demo project" : "Diff only"}</strong>
         </span>
 
         <div className="flex items-center space-x-2">

@@ -6,9 +6,13 @@ build-backend = "setuptools.build_meta"
 name = "changestory"
 version = "1.0.0"
 description = "ChangeStory CLI for deterministic change impact analysis"
-readme = "README.md"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn>=0.30.0",
+    "pydantic>=2.0.0",
+    "pytest>=8.0.0",
+]
 
 [project.scripts]
 changestory = "changestory_cli.main:cli_main"

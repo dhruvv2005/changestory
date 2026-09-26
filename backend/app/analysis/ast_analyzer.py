@@ -126,6 +126,7 @@ class SymbolVisitor(ast.NodeVisitor):
 def parse_python_source(source_code: str, file_path: str, module_prefix: str = "") -> ParsedModuleInfo:
     """Parse python code string into module info and symbols."""
     clean_path = file_path.replace("\\", "/")
+    source_code = source_code.removeprefix("\ufeff")
     try:
         tree = ast.parse(source_code, filename=clean_path)
     except SyntaxError as e:
@@ -159,7 +160,7 @@ def parse_python_source(source_code: str, file_path: str, module_prefix: str = "
 def parse_python_file(absolute_file_path: Path, relative_file_path: str, module_prefix: str = "") -> ParsedModuleInfo:
     """Read and parse python file from filesystem."""
     try:
-        content = absolute_file_path.read_text(encoding="utf-8")
+        content = absolute_file_path.read_text(encoding="utf-8-sig")
         return parse_python_source(content, relative_file_path, module_prefix)
     except FileNotFoundError:
         return ParsedModuleInfo(

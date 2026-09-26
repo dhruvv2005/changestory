@@ -19,6 +19,7 @@ from app.config import BASE_DIR, FIXTURES_DIR, SAMPLE_PROJECT_DIR
 from app.models.schemas import (
     AnalyzeRequest,
     ChangeStoryReport,
+    ProjectContext,
     VerificationResult,
     VerifyRequest,
 )
@@ -45,14 +46,20 @@ def analyze_diff(req: AnalyzeRequest) -> ChangeStoryReport:
             raise HTTPException(status_code=400, detail=f"Local repository path does not exist: {req.repository_path}")
         target_dir = local_path
     elif req.source_mode == "local":
-        # No explicit path: scan from project root so suffix/basename matching
-        # works for any custom diff that references Python files by partial path.
-        target_dir = BASE_DIR
+        raise HTTPException(status_code=400, detail="Local analysis requires repository_path. Run analysis with the ChangeStory CLI from your project.")
     else:
-        target_dir = SAMPLE_PROJECT_DIR
+        target_dir = BASE_DIR / ".changestory-diff-only"
 
     engine = ChangeStoryEngine(target_dir)
     report = engine.analyze(req.diff_text)
+    report.project = ProjectContext(
+        name="Diff only" if req.source_mode == "diff_only" else target_dir.name,
+        root=str(target_dir.resolve()) if req.source_mode != "diff_only" else None,
+        git_root=str(target_dir.resolve()) if req.source_mode == "local" else None,
+        analysis_mode=req.source_mode,
+    )
+    if req.source_mode == "diff_only":
+        report.limitations.append("Diff-only analysis has no repository-wide caller, dependency, or test context.")
 
     # Persist report
     report_store.save_report(report)
@@ -99,6 +106,9 @@ def verify_session(session_id: str) -> VerificationResult:
     report = report_store.get_report(session_id)
     if not report:
         raise HTTPException(status_code=404, detail=f"Report session '{session_id}' not found.")
+
+    if not report.project or report.project.analysis_mode != "sample":
+        raise HTTPException(status_code=400, detail="Controlled test execution is available only for the bundled sample project. Run the recommended tests in your local project directly.")
 
     try:
         verification = test_runner.run_tests()

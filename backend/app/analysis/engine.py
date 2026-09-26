@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 import hashlib
 import re
 from pathlib import Path
+import subprocess
 from typing import Dict, List, Optional, Tuple
 
 from app.analysis.ast_analyzer import (
@@ -55,13 +56,35 @@ class ChangeStoryEngine:
         self.repo_dir = repo_dir
 
     def scan_repository_modules(self) -> Dict[str, ParsedModuleInfo]:
-        """Scan and parse all Python files in the repository."""
+        """Parse Python files Git considers part of the project, respecting ignore rules."""
         modules: Dict[str, ParsedModuleInfo] = {}
         if not self.repo_dir.exists():
             return modules
 
-        py_files = sorted(list(self.repo_dir.rglob("*.py")), key=lambda p: str(p))
+        try:
+            tracked = subprocess.run(
+                ["git", "ls-files", "--cached", "--others", "--exclude-standard", "--", "."],
+                cwd=str(self.repo_dir), capture_output=True, text=True, shell=False, timeout=10,
+            )
+        except (OSError, subprocess.SubprocessError):
+            tracked = None
+
+        if tracked and tracked.returncode == 0:
+            py_files = [self.repo_dir / Path(name) for name in tracked.stdout.splitlines() if name.lower().endswith(".py")]
+        else:
+            excluded = {".git", ".changestory", ".venv", "venv", "node_modules", "__pycache__", "build", "dist"}
+            py_files = [
+                path for path in self.repo_dir.rglob("*.py")
+                if not any(part.lower() in excluded for part in path.relative_to(self.repo_dir).parts)
+            ]
+
+        py_files = sorted(py_files, key=lambda p: str(p))
         for py_file in py_files:
+            try:
+                if self.repo_dir.resolve() not in py_file.resolve().parents or not py_file.is_file():
+                    continue
+            except OSError:
+                continue
             rel_path = str(py_file.relative_to(self.repo_dir)).replace("\\", "/")
             if "venv" in rel_path or ".git" in rel_path or "__pycache__" in rel_path or "node_modules" in rel_path:
                 continue
@@ -77,29 +100,62 @@ class ChangeStoryEngine:
         """Try multiple strategies to resolve a diff file path to a ParsedModuleInfo.
 
         Handles cases where the diff uses a different path prefix than the scanned repo,
-        e.g. 'a/src/calc.py' vs 'src/calc.py' vs 'calc.py'.
+        e.g. 'a/src/calc.py' vs 'src/calc.py' vs 'calc.py'. It also tolerates common
+        module naming aliases such as 'api.py' mapping to 'api_routes.py'.
         """
+        normalized_file_path = file_path.replace("\\", "/").lstrip("./")
+        basename = normalized_file_path.split("/")[-1]
+        stem = basename.replace(".py", "")
+
+        def stem_key(name: str) -> str:
+            raw = name.replace("\\", "/").split("/")[-1].replace(".py", "")
+            for suffix in ("_routes", "_service", "_controller", "_handlers", "_api", "_views"):
+                if raw.endswith(suffix):
+                    raw = raw[: -len(suffix)]
+                    break
+            return raw.lower()
+
         # Strategy 1: exact match
-        if file_path in repo_modules:
-            return repo_modules[file_path]
+        if normalized_file_path in repo_modules:
+            return repo_modules[normalized_file_path]
 
         # Strategy 2: suffix match — find any scanned module whose path ends with file_path
         for k, v in repo_modules.items():
-            if k.endswith(file_path) or file_path.endswith(k):
+            if k.endswith(normalized_file_path) or normalized_file_path.endswith(k):
                 return v
 
-        # Strategy 3: basename match (last resort for flat projects)
-        basename = file_path.split("/")[-1]
+        # Strategy 3: basename match with common alias suffixes (api.py -> api_routes.py)
+        for k, v in repo_modules.items():
+            k_base = k.split("/")[-1].replace(".py", "")
+            if k_base.lower() == stem.lower():
+                return v
+            if stem_key(k) == stem.lower() or stem.lower() == stem_key(k):
+                return v
+            if stem_key(k).startswith(stem.lower()) or stem.lower().startswith(stem_key(k)):
+                return v
+
+        # Strategy 4: basename match (last resort for flat projects)
         candidates = [v for k, v in repo_modules.items() if k.split("/")[-1] == basename]
         if len(candidates) == 1:
             return candidates[0]
 
-        # Strategy 4: try loading from disk with various path combinations
-        for try_path in [self.repo_dir / file_path, Path(file_path)]:
+        # Strategy 5: try loading from disk with various path combinations
+        for try_path in [self.repo_dir / normalized_file_path, Path(normalized_file_path), self.repo_dir / basename, Path(basename)]:
             if try_path.exists() and try_path.suffix == ".py":
-                mod = parse_python_file(try_path, file_path)
-                repo_modules[file_path] = mod
+                mod = parse_python_file(try_path, normalized_file_path)
+                repo_modules[normalized_file_path] = mod
                 return mod
+
+        # Strategy 6: find the closest module by logical stem when alias paths are used
+        toggle_candidates = []
+        for k, v in repo_modules.items():
+            k_stem = stem_key(k)
+            if not k_stem or not stem:
+                continue
+            if k_stem == stem.lower() or stem.lower().startswith(k_stem) or k_stem.startswith(stem.lower()):
+                toggle_candidates.append(v)
+        if len(toggle_candidates) == 1:
+            return toggle_candidates[0]
 
         return None
 

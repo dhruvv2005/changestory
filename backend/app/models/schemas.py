@@ -97,10 +97,18 @@ class Explanation(BaseModel):
     text: str
 
 
+class ProjectContext(BaseModel):
+    name: str
+    root: Optional[str] = None
+    git_root: Optional[str] = None
+    analysis_mode: Literal["local", "sample", "diff_only"] = "local"
+
+
 class ChangeStoryReport(BaseModel):
     schema_version: str = "1.0"
     session_id: str
     timestamp: Optional[str] = None
+    project: Optional[ProjectContext] = None
     change_summary: ChangeSummary
     files: List[FileChange] = Field(default_factory=list)
     changed_symbols: List[Symbol] = Field(default_factory=list)
@@ -117,7 +125,7 @@ class ChangeStoryReport(BaseModel):
 class AnalyzeRequest(BaseModel):
     diff_text: str
     repository_path: Optional[str] = None
-    source_mode: Literal["sample", "local"] = "sample"
+    source_mode: Literal["sample", "local", "diff_only"] = "sample"
 
 
 class VerifyRequest(BaseModel):

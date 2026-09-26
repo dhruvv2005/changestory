@@ -102,6 +102,12 @@ export interface ChangeStoryReport {
   schema_version: string;
   session_id: string;
   timestamp?: string | null;
+  project?: {
+    name: string;
+    root?: string | null;
+    git_root?: string | null;
+    analysis_mode: "local" | "sample" | "diff_only";
+  } | null;
   change_summary: ChangeSummary;
   files: FileChange[];
   changed_symbols: Symbol[];

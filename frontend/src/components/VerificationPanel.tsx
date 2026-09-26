@@ -9,6 +9,7 @@ interface VerificationPanelProps {
   verification?: VerificationResult | null;
   onRunVerification: () => Promise<void>;
   loading: boolean;
+  enabled?: boolean;
 }
 
 export const VerificationPanel: React.FC<VerificationPanelProps> = ({
@@ -16,6 +17,7 @@ export const VerificationPanel: React.FC<VerificationPanelProps> = ({
   verification,
   onRunVerification,
   loading,
+  enabled = true,
 }) => {
   return (
     <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-5 shadow-lg flex flex-col">
@@ -33,7 +35,7 @@ export const VerificationPanel: React.FC<VerificationPanelProps> = ({
         <button
           type="button"
           onClick={onRunVerification}
-          disabled={loading}
+          disabled={loading || !enabled}
           className="flex items-center space-x-1.5 px-4 py-1.5 text-xs font-semibold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 rounded-md shadow-md shadow-emerald-950/40 transition disabled:opacity-50 self-start sm:self-auto"
         >
           {loading ? (
@@ -41,6 +43,8 @@ export const VerificationPanel: React.FC<VerificationPanelProps> = ({
               <div className="h-3.5 w-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               <span>Running Pytest...</span>
             </>
+          ) : !enabled ? (
+            <span>Sample verification only</span>
           ) : (
             <>
               <Play className="h-3.5 w-3.5 fill-current" />

@@ -1,7 +1,8 @@
 import pytest
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 from app.analysis.ast_analyzer import parse_python_file
-from app.analysis.caller_analyzer import analyze_direct_callers
+from app.analysis.caller_analyzer import analyze_direct_callers, find_call_sites_in_file
 from app.config import SAMPLE_PROJECT_DIR
 from app.models.schemas import Symbol
 
@@ -41,3 +42,16 @@ def test_analyze_direct_callers_calculator():
     assert rel.relationship == "calls"
     assert rel.evidence is not None
     assert "calculate_total" in rel.evidence.snippet
+
+
+def test_find_call_sites_accepts_utf8_bom():
+    with NamedTemporaryFile(mode="w", encoding="utf-8", suffix="_caller.py", dir=Path(__file__).parent, delete=False) as stream:
+        stream.write("\ufeffdef create_order(items):\n    return calculate_total(items)\n")
+        caller_file = Path(stream.name)
+    try:
+        sites = find_call_sites_in_file(caller_file, caller_file.name)
+
+        assert len(sites) == 1
+        assert sites[0].target_name == "calculate_total"
+    finally:
+        caller_file.unlink(missing_ok=True)
