@@ -1,0 +1,8 @@
+--- a/changestory_sample/utils.py
++++ b/changestory_sample/utils.py
+@@ -3,3 +3,4 @@
+ def format_currency(amount: float) -> str:
+     """Format a monetary amount to a standard currency string."""
+-    return f"${amount:0.2f}"
++    # Updated format to include currency code
++    return f"USD ${amount:0.2f}"

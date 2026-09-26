@@ -1,0 +1,14 @@
+--- a/changestory_sample/calculator.py
++++ b/changestory_sample/calculator.py
+@@ -4,3 +4,4 @@
+ def calculate_total(price: float, tax_rate: float) -> float:
+     """Calculate the final total price including tax."""
+-    return price + (price * tax_rate)
++    return price + (price * tax_rate) + 1.0
+--- a/changestory_sample/utils.py
++++ b/changestory_sample/utils.py
+@@ -3,3 +3,3 @@
+ def format_currency(amount: float) -> str:
+     """Format a monetary amount to a standard currency string."""
+-    return f"${amount:0.2f}"
++    return f"USD {amount:0.2f}"

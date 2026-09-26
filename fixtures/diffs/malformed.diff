@@ -1,0 +1,4 @@
+This is not a valid git diff header
+Just random corrupted lines
+@@ invalid chunk header @@
++ some random text

@@ -1,0 +1,10 @@
+--- a/changestory_sample/api_routes.py
++++ b/changestory_sample/api_routes.py
+@@ -16,3 +16,9 @@
+     formatted = format_currency(amount)
+     return {"formatted": formatted}
++
++@router.get("/discount")
++def discount_endpoint(price: float = 100.0, discount_percent: float = 10.0):
++    """Endpoint to calculate discounted prices."""
++    return {"discounted": price * (1.0 - discount_percent / 100.0)}

@@ -1,0 +1,8 @@
+--- a/changestory_sample/calculator.py
++++ b/changestory_sample/calculator.py
+@@ -4,3 +4,4 @@
+ def calculate_total(price: float, tax_rate: float) -> float:
+     """Calculate the final total price including tax."""
+-    return price + (price * tax_rate)
++    tax = price * tax_rate
++    return price + tax + 5.0
