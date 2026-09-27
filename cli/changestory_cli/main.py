@@ -29,6 +29,7 @@ SERVICE_START_TIMEOUT_SECONDS = 25
 def git_output(repo_path: Path, *args: str) -> subprocess.CompletedProcess:
     return subprocess.run(
         ["git", *args], cwd=str(repo_path), capture_output=True, text=True,
+        encoding="utf-8", errors="replace",
         shell=False, timeout=15,
     )
 
@@ -225,13 +226,13 @@ def get_git_diff(repo_path: Path) -> str:
         if tracked.returncode != 0:
             unstaged = git_output(repo_path, "diff", "--find-renames", "--")
             staged = git_output(repo_path, "diff", "--cached", "--find-renames", "--")
-            tracked_text = (staged.stdout if staged.returncode == 0 else "") + (unstaged.stdout if unstaged.returncode == 0 else "")
+            tracked_text = (staged.stdout or "" if staged.returncode == 0 else "") + (unstaged.stdout or "" if unstaged.returncode == 0 else "")
         else:
-            tracked_text = tracked.stdout
+            tracked_text = tracked.stdout or ""
         diff_parts = [tracked_text] if tracked_text.strip() else []
         untracked = git_output(repo_path, "ls-files", "--others", "--exclude-standard", "--")
         if untracked.returncode == 0:
-            for relative_name in untracked.stdout.splitlines():
+            for relative_name in (untracked.stdout or "").splitlines():
                 rel = Path(relative_name)
                 if any(part.lower() in IGNORED_UNTRACKED_PARTS for part in rel.parts):
                     continue
